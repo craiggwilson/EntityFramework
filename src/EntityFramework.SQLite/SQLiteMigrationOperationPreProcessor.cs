@@ -5,40 +5,40 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using Microsoft.Data.Entity.Metadata;
 using Microsoft.Data.Entity.Migrations;
 using Microsoft.Data.Entity.Migrations.Model;
 using Microsoft.Data.Entity.Relational;
-using Microsoft.Data.Entity.Relational.Model;
 using Microsoft.Data.Entity.SQLite.Utilities;
 
 namespace Microsoft.Data.Entity.SQLite
 {
     public class SQLiteMigrationOperationPreProcessor : MigrationOperationVisitor<SQLiteMigrationOperationPreProcessor.Context>
     {
-        private readonly SQLiteTypeMapper _typeMapper;
+        private readonly SQLiteModelDiffer _modelDiffer;
 
-        public SQLiteMigrationOperationPreProcessor([NotNull] SQLiteTypeMapper typeMapper)
+        public SQLiteMigrationOperationPreProcessor([NotNull] SQLiteModelDiffer modelDiffer)
         {
-            Check.NotNull(typeMapper, "typeMapper");
+            Check.NotNull(modelDiffer, "modelDiffer");
 
-            _typeMapper = typeMapper;
+            _modelDiffer = modelDiffer;
         }
 
-        public virtual SQLiteTypeMapper TypeMapper
+        public virtual SQLiteModelDiffer ModelDiffer
         {
-            get { return _typeMapper; }
+            get { return _modelDiffer; }
         }
 
         public virtual IReadOnlyList<MigrationOperation> Process(            
             [NotNull] MigrationOperationCollection operations,
-            [NotNull] DatabaseModel sourceDatabase,
-            [NotNull] DatabaseModel targetDatabase)
+            [NotNull] IModel sourceModel,
+            [NotNull] IModel targetModel)
         {            
             Check.NotNull(operations, "operations");
-            Check.NotNull(sourceDatabase, "sourceDatabase");
-            Check.NotNull(targetDatabase, "targetDatabase");
+            Check.NotNull(sourceModel, "sourceModel");
+            Check.NotNull(targetModel, "targetModel");
 
-            var context = new Context(sourceDatabase, targetDatabase);
+            var context = new Context(ModelDiffer, sourceModel, targetModel);
 
             foreach (var operation in operations.GetAll())
             {
@@ -194,11 +194,13 @@ namespace Microsoft.Data.Entity.SQLite
 
             context.HandlePendingOperations();
 
-            var table = context.SourceDatabase.GetTable(operation.TableName);
-            var index = table.GetIndex(operation.IndexName);
+            var table = context.SourceModel.EntityTypes.Single(
+                t => ModelDiffer.NameGenerator.SchemaQualifiedTableName(t) == operation.TableName);
+            var index = table.Indexes.Single(
+                ix => ModelDiffer.NameGenerator.IndexName(ix) == operation.IndexName);
 
-            context.HandleOperation(new DropIndexOperation(operation.TableName, operation.IndexName));
-            context.HandleOperation(new CreateIndexOperation(index));
+            context.HandleOperation(ModelDiffer.OperationFactory.DropIndexOperation(index));
+            context.HandleOperation(ModelDiffer.OperationFactory.CreateIndexOperation(index));
         }
 
         protected override void VisitDefault(MigrationOperation operation, Context context)
@@ -359,12 +361,13 @@ namespace Microsoft.Data.Entity.SQLite
             {
                 Check.NotNull(context, "context");
 
-                var targetTable = context.TargetDatabase.GetTable(TableName);
+                var targetTable = context.TargetModel.EntityTypes.Single(
+                    t => context.ModelDiffer.NameGenerator.SchemaQualifiedTableName(t) == TableName);
                 var sourceTableName = InitialTableName;
                 var targetColumnNames
-                    = targetTable.Columns
-                        .Where(c => ColumnNamePairs.ContainsKey(c.Name))
-                        .Select(c => c.Name)
+                    = targetTable.Properties
+                        .Where(p => ColumnNamePairs.ContainsKey(p.Relational().Column))
+                        .Select(p => p.Relational().Column)
                         .ToArray();
                 var sourceColumnNames
                     = targetColumnNames
@@ -375,10 +378,10 @@ namespace Microsoft.Data.Entity.SQLite
                 {
                     sourceTableName = new SchemaQualifiedName("__mig_tmp__" + sourceTableName.Name, sourceTableName.Schema);
 
-                    yield return new RenameTableOperation(targetTable.Name, sourceTableName.Name);
+                    yield return context.ModelDiffer.OperationFactory.RenameTableOperation(targetTable, sourceTableName.Name);
                 }
 
-                yield return new CreateTableOperation(targetTable);
+                yield return context.ModelDiffer.OperationFactory.CreateTableOperation(targetTable);
 
                 yield return new CopyDataOperation(
                     sourceTableName, sourceColumnNames, targetTable.Name, targetColumnNames);
@@ -389,29 +392,36 @@ namespace Microsoft.Data.Entity.SQLite
 
         public class Context
         {
-            private readonly DatabaseModel _sourceDatabase;
-            private readonly DatabaseModel _targetDatabase;
+            private readonly SQLiteModelDiffer _modelDiffer;
+            private readonly IModel _sourceModel;
+            private readonly IModel _targetModel;
             private readonly List<MigrationOperation> _operations = new List<MigrationOperation>();
             private readonly List<TableOperationHandler> _handlers = new List<TableOperationHandler>();
             private readonly List<MigrationOperation> _deferredOperations = new List<MigrationOperation>();
 
-            public Context([NotNull] DatabaseModel sourceDatabase, [NotNull] DatabaseModel targetDatabase)
+            public Context([NotNull] SQLiteModelDiffer modelDiffer, [NotNull] IModel sourceModel, [NotNull] IModel targetModel)
             {
-                Check.NotNull(sourceDatabase, "sourceDatabase");
-                Check.NotNull(targetDatabase, "targetDatabase");
+                Check.NotNull(sourceModel, "sourceModel");
+                Check.NotNull(targetModel, "targetModel");
 
-                _sourceDatabase = sourceDatabase;
-                _targetDatabase = targetDatabase;
+                _modelDiffer = modelDiffer;
+                _sourceModel = sourceModel;
+                _targetModel = targetModel;
             }
 
-            public virtual DatabaseModel SourceDatabase
+            public virtual SQLiteModelDiffer ModelDiffer
             {
-                get { return _sourceDatabase; }
+                get { return _modelDiffer; }
             }
 
-            public virtual DatabaseModel TargetDatabase
+            public virtual IModel SourceModel
             {
-                get { return _targetDatabase; }
+                get { return _sourceModel; }
+            }
+
+            public virtual IModel TargetModel
+            {
+                get { return _targetModel; }
             }
 
             public virtual IReadOnlyList<MigrationOperation> Operations
@@ -461,8 +471,9 @@ namespace Microsoft.Data.Entity.SQLite
 
                 if (handler == null)
                 {
-                    var table = _sourceDatabase.TryGetTable(tableName);
-                    var columnNames = table != null ? table.Columns.Select(c => c.Name) : Enumerable.Empty<string>();
+                    var entityType = SourceModel.EntityTypes.Single(
+                        t => ModelDiffer.NameGenerator.SchemaQualifiedTableName(t) == tableName);
+                    var columnNames = entityType.Properties.Select(p => ModelDiffer.ExtensionProvider.Extensions(p).Column);
 
                     SetHandler(handler
                         = supported

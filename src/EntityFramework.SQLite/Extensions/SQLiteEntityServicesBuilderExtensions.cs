@@ -6,6 +6,7 @@ using Microsoft.Data.Entity;
 using Microsoft.Data.Entity.Migrations;
 using Microsoft.Data.Entity.Migrations.Infrastructure;
 using Microsoft.Data.Entity.Relational;
+using Microsoft.Data.Entity.Relational.Metadata;
 using Microsoft.Data.Entity.SQLite;
 using Microsoft.Data.Entity.SQLite.Utilities;
 using Microsoft.Data.Entity.Storage;
@@ -37,6 +38,7 @@ namespace Microsoft.Framework.DependencyInjection
                 .AddScoped<SQLiteConnection>()
                 .AddScoped<SQLiteMigrationOperationSqlGeneratorFactory>()
                 .AddScoped<SQLiteDataStoreCreator>()
+                .AddScoped<RelationalMetadataExtensionProvider>()
                 .AddScoped<SQLiteMigrator>()
                 .AddScoped<SQLiteDatabase>()
                 // TODO: Move to an AddMigrations extension method?

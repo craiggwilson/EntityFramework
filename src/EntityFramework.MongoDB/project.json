@@ -1,0 +1,16 @@
+{
+    "version": "7.0.0-*",
+    "description":  "MongoDB data store for Entity Framework.",
+    "compilationOptions": {
+        "warningsAsErrors": true
+    },
+    "dependencies": {
+        "EntityFramework": "",
+        "mongocsharpdriver":  ""
+    },
+    "code": [ "**\\*.cs", "..\\Shared\\*.cs" ],
+    "frameworks": {
+        "net45": { },
+        "aspnet50": { }
+    }
+}

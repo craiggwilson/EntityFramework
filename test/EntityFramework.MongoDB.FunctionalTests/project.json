@@ -1,0 +1,14 @@
+{
+    "dependencies": {
+        "EntityFramework.MongoDB": "7.0.0-*",
+        "EntityFramework.FunctionalTests": "1.0.0",
+        "xunit": ""
+    },
+    "commands": {
+        "test": "Xunit.KRunner"
+    },
+    "frameworks": {
+        "net45": { },
+        "aspnet50": { }
+    }
+}

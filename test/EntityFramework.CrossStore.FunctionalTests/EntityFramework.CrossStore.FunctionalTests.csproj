@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <Import Project="..\..\tools\EntityFramework.props" />
@@ -85,11 +85,11 @@
     </ProjectReference>
     <ProjectReference Include="..\..\src\EntityFramework\EntityFramework.csproj">
       <Project>{71415CEC-8111-4C73-8751-512D22F10602}</Project>
-      <Name>Microsoft.Data.Entity</Name>
+      <Name>EntityFramework</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\EntityFramework.AzureTableStorage\EntityFramework.AzureTableStorage.csproj">
       <Project>{c059860c-039d-48c0-b381-987db950bb5d}</Project>
-      <Name>Microsoft.Data.Entity.AzureTableStorage</Name>
+      <Name>EntityFramework.AzureTableStorage</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\EntityFramework.InMemory\EntityFramework.InMemory.csproj">
       <Project>{BA3F5DBC-EC16-4D5A-8298-8226E6C5ACCC}</Project>
